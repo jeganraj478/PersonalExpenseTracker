@@ -1,26 +1,32 @@
-import React, { useState, useMemo, useCallback } from "react"
-import { useQuery } from 'react-query'
 import axios from 'axios'
+import React, { useCallback, useMemo, useState } from "react"
+import { useQuery } from 'react-query'
+import axiosInstance from "../Fetch/AxiosConfig"
+import { useNavigate } from "react-router-dom"
 import Tesseract from "tesseract.js"
+//Notificaton
+import { ToastContainer, toast } from 'react-toastify'
+import 'react-toastify/dist/ReactToastify.css'
+//FetchData
+import { fetchBudget, fetchCategory, fetchExpenses } from "../Fetch/FetchData"
 
-import { fetchCategory, fetchExpenses, fetchBudget } from "../Query/Query"
-
-import Sidebar from './Sidebar'
-import Topbar from '../Atoms/Topbar'
-import Flex from "../Atoms/Flex"
-import Heading from '../Atoms/Heading'
 import Button from '../Atoms/Button'
-import Modal from "../Molecules/Modal"
+import FileInput from '../Atoms/FileInput'
+import Flex from "../Atoms/Flex"
+import Form from '../Atoms/Form'
+import Heading from '../Atoms/Heading'
 import Input from '../Atoms/Input'
 import Label from '../Atoms/Label'
-import Select from "../Atoms/Select"
-import Table from '../Molecules/Table'
 import Layout from "../Atoms/Layout"
-import Form from '../Atoms/Form'
-import Dialog from '../Molecules/FileDialog'
-import FileInput from '../Atoms/FileInput'
+import Select from "../Atoms/Select"
+import Topbar from '../Atoms/Topbar'
 import DataDialog from "../Molecules/DataDialog"
-
+import Dialog from '../Molecules/FileDialog'
+import Modal from "../Molecules/Modal"
+import Table from '../Molecules/Table'
+import Sidebar from './Sidebar'
+import Confirmation from '../Atoms/Confirmation'
+import SearchBar from '../Atoms/SearchBar'
 
 
 const aiModelMap = (text) => {
@@ -30,7 +36,8 @@ const aiModelMap = (text) => {
     return {
         contents: [{
             parts: [{
-                text: "Extract the Amount,Category,Date from the below text and the return as a JSON with keys Amount,Category,Date." + text
+                text:
+                    'Please extract the Amount, Category, and Date from the provided text. Return the information as a list of maps . Ensure that the output does not include triple-coded JSON or triple-coded backticks JSON and remove any JSON markdown. Each map should contain non-null values for the keys Amount, Category, and Date.' + text
 
             }]
         }]
@@ -42,13 +49,34 @@ const aiModelMap = (text) => {
 
 
 const Expense = () => {
+    const userId = localStorage.getItem("userId")
+
+    /* const [Loading, setLoading] = useState(true)
+        const navigate = useNavigate()
+        const [cookies] = useCookies(['token']);
+        const token = cookies.token;
+        console.log(token)
+    
+        useQuery("verifyToken", () => verifyToken(token), {
+            onSuccess: () => {
+                setLoading(false)
+            },
+            onError: (error) => {
+                console.log(error)
+                navigate("/");
+                setLoading(false)
+    
+            },
+        });
+    
+        if (Loading) {
+            return <Spinner></Spinner>
+        } */
 
     const [sideBar, setSideBar] = useState(true)
     const handleSideBar = () => {
         setSideBar(!sideBar)
     }
-
-
 
     const [columns, setColumns] = useState([
         { 'id': 0, 'headerName': 'Date', 'columnName': 'expenseDate', 'sortUp': false, 'sortDown': false, 'dateColumn': true, 'moneyColumn': false },
@@ -56,14 +84,8 @@ const Expense = () => {
         { 'id': 2, 'headerName': 'Amount', 'columnName': 'expenseAmount', 'sortUp': false, 'sortDown': false, 'dateColumn': true, 'moneyColumn': true }
     ])
 
-
-    const [searchTerm, setSearchTerm] = useState('');
-    const [sortBy, setSortBy] = useState('expenseDate');
-    const [sortOrder, setSortOrder] = useState('desc');
-
-
-
     //Fetch Category AND Budget;
+
     const { data: budgetData, isLoading: budgetLoading, error: budgetError } = useQuery(
         "budgetType",
         () => fetchBudget(),
@@ -80,21 +102,60 @@ const Expense = () => {
         }
     );
 
+    const memoizedBudgetData = useMemo(() => !budgetData ? [] : budgetData, [budgetData]);
+    const memoizedCategoryData = useMemo(() => categoryData, [categoryData]);
+
+    const [searchTerm, setSearchTerm] = useState('');
+    const [sortBy, setSortBy] = useState('expenseDate');
+    const [sortOrder, setSortOrder] = useState('desc');
+
     //Fetch Data
     const { data: expenses, isLoading, error, refetch } = useQuery(
-        ["expense", { sortBy, sortOrder }],
+        ["expense", { sortBy, sortOrder, searchTerm }],
         () => fetchExpenses(sortBy, sortOrder, searchTerm),
         {
             dataKey: "expense",
         }
     );
 
-    const memoizedBudgetData = useMemo(() => budgetData, [budgetData]);
-    const memoizedCategoryData = useMemo(() => categoryData, [categoryData]);
-    const memoizedExpenses = useMemo(() => expenses, [expenses]);
+    // Function to highlight matched words in a string
+    const highlightMatchedWords=(text, searchTerm) =>{
+        console.log(typeof text)
+        console.log(typeof searchTerm)
+
+        if (!searchTerm || !text) return text;
+
+        const regex = new RegExp(`(${searchTerm})`, 'gi');
+        const parts = text.split(regex);
+        console.log(parts)
+
+        return parts.map((part, index) => {
+            if (index % 2 === 1) {
+                return <span className="bg-green-400" key={index}>{part}</span>;
+            } else {
+                return part;
+            }
+        });
+    }
 
 
+    const memoizedExpenses = useMemo(() => {
+        if (!expenses) return [];
 
+        const hightlightedExpenseData = expenses.map(expense => {
+            return {
+                ...expense,
+                expenseCategory: highlightMatchedWords(expense.expenseCategory, searchTerm),
+                formattedExpenseDate: highlightMatchedWords(expense.formattedExpenseDate, searchTerm),
+                formattedExpenseAmount: highlightMatchedWords(expense.formattedExpenseAmount, searchTerm)
+
+            };
+        })
+        return hightlightedExpenseData;
+    }, [expenses, searchTerm]);
+
+
+    // Sorting
     const handleSortUp = useCallback((sortColumn, index) => {
         setSortBy(sortColumn)
         setSortOrder('asc')
@@ -122,28 +183,36 @@ const Expense = () => {
     }, [columns, refetch])
 
 
+    const [openConfirm, setConfirm] = useState(false)
+    const [editMode, setEditMode] = useState(false)
 
     // Form Inputs
-    const [editMode, setEditMode] = useState(false)
     const [id, setId] = useState('')
     const [Amount, setAmount] = useState(0);
     const [Category, setCategory] = useState('');
     const [Date, setDate] = useState('');
     const [BudgetType, setBudgetType] = useState("");
 
-    const handleSave = async (e) => {
+
+    const confirmationDialog = (e) => {
+        e.preventDefault();
+        setConfirm(true)
+    }
+
+    const handleSave = async () => {
+        setConfirm(false)
         try {
-            e.preventDefault()
-            console.log(BudgetType)
             if (Category.trim() === '' || Date.trim() === '' || Amount === 0 || BudgetType.trim() === '') {
                 return
             }
-            await axios.post("http://localhost:3001/saveExpense", { 'Amount': Amount, 'Category': Category, "Date": Date, "Budget": BudgetType, 'userId': 1 }).then((response) => {
-                console.log(response.data)
-            })
+            const response = await axiosInstance.post("http://localhost:3001/saveExpense", { 'Amount': Amount, 'Category': Category, "Date": Date, "Budget": BudgetType, 'userId': userId })
+            const { message } = response.data
+            toast.success(message)
 
         } catch (error) {
             console.log("Message : " + error.message)
+            toast.error(error.message)
+
         }
 
         setAmount(0);
@@ -154,19 +223,20 @@ const Expense = () => {
         refetch();
     }
 
-    const handleUpdate = async (e) => {
+    const handleUpdate = async () => {
         try {
-            console.log(id, Amount, Date, BudgetType)
-            e.preventDefault()
             if (Category.trim() === '' || Date.trim() === '' || Amount === 0 || BudgetType.trim() === '') {
                 return
             }
-            await axios.post("http://localhost:3001/updateExpense", { 'expenseId': id, 'Amount': Amount, 'Category': Category, "Date": Date, "Budget": BudgetType, 'userId': 1 }).then((response) => {
-                console.log(response.data)
-            })
+            setConfirm(false)
+            const response = await axiosInstance.post("http://localhost:3001/updateExpense", { 'expenseId': id, 'Amount': Amount, 'Category': Category, "Date": Date, "Budget": BudgetType, 'userId': userId })
+            const { message } = response.data
+            toast.success(message)
 
         } catch (error) {
             console.log("Message : " + error)
+            toast.error(error.message)
+
         }
         setAmount(0);
         setId('')
@@ -177,19 +247,30 @@ const Expense = () => {
         refetch();
     }
 
+    //handleDelete
+    const [deleteConfirm, setDeleteConfirm] = useState(false)
+    const [idToDelete, setIdToDelete] = useState('')
+    const deleteConfirmation = (id) => {
+        console.log(id)
+        setIdToDelete(id)
+        setDeleteConfirm(true)
+    }
 
-    const handleDelete = async (id) => {
+    const handleDelete = async () => {
         console.log("API Started")
+        setDeleteConfirm(false)
         try {
-            const res = await axios.delete("http://localhost:3001/deleteExpense", {
+            const response = await axiosInstance.delete("http://localhost:3001/deleteExpense", {
                 params: {
-                    "expenseId": id
+                    "expenseId": idToDelete
                 }
             })
-            console.log(res)
+            const { message } = response.data
+            toast.success(message)
         } catch (error) {
-            console.log(error.message)
+            toast.error(error.message)
         }
+        refetch()
     }
 
 
@@ -226,47 +307,46 @@ const Expense = () => {
         setBudgetType((data["budgetType"]))
         setDate(data["expenseDate"].toString().split("T")[0])
 
-        console.log(BudgetType)
-
-    }
-
-    const handleSearch = () => {
-        refetch()
     }
 
 
+
+    //AI Result
+    const [aiResult, setAiResult] = useState([]);
+    const [dataDialog, setDataDialog] = useState(false);
+    const handleDataDialog = () => {
+        setDataDialog(!dataDialog)
+    }
+    console.log(aiResult)
+
+    const aiResultFunction = (result) => {
+        console.log(typeof result); // This will log the type of myState
+
+        const updatedResult = result.map((item, i) => ({
+            ...item,
+            "checkBox": true,
+        })
+        )
+        setAiResult(updatedResult)
+    }
 
 
     // AI FILE ANALYSIS
-
     const [fileDialogOpen, setFileDialogOpen] = useState(false)
-
-
-    const handlefileDialog = () => {
-        setFileDialogOpen(!fileDialogOpen)
-    }
-    const [dataDialog,setDataDialog]=useState(true);
-    const handleDataDialog=()=>{
-        setDataDialog(!dataDialog)
-    }
-
-
     const [selectedFile, setSelectedFile] = useState(null);
-
+    const [analysisStarted, setAnalysisStarted] = useState(false);
+    const [analysisStage, setAnalysisStage] = useState('')
     const handleFileChange = (e) => {
         const file = e.target.files[0];
         setSelectedFile(file);
 
     };
-
-    const [extractedText, setExtractedText] = useState('');
-    const [analysisStarted, setAnalysisStarted] = useState(false);
-    const [analysisStage, setAnalysisStage] = useState('')
+    const handlefileDialog = () => {
+        setFileDialogOpen(!fileDialogOpen)
+    }
 
 
     const FileAnalysis = async () => {
-
-
         if (selectedFile) {
             try {
                 console.log("File Analysis Started")
@@ -280,28 +360,23 @@ const Expense = () => {
                 );
                 console.log("File Analysis Ended")
 
-                setExtractedText(text);
-
                 const aiMap = aiModelMap(text)
 
                 console.log("Ai Analysis Started")
+
                 setAnalysisStage("Analysing Text")
+                const response = await axios.post("https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=AIzaSyAGXLt6HZQ5rFnmTW_YCYOxVHi516MEXJ8 ", aiMap)
+                const textValue = response.data.candidates[0]?.content?.parts[0]?.text || "";
 
-                try {
-                    await axios.post("https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=AIzaSyAGXLt6HZQ5rFnmTW_YCYOxVHi516MEXJ8 ", aiMap).then((response) => {
-                        const textValue = response.data.candidates[0]?.content?.parts[0]?.text || '';
-                        console.log(textValue)
-                        handleDataDialog()
+                console.log(typeof textValue)
+                console.log(textValue)
+                const jsonStr = textValue.replace(/^```json\n|```$/g, '');
+                const parsedObject = JSON.parse(jsonStr);
+                console.log(typeof parsedObject)
+                setAiResult(parsedObject || [])
+                handleDataDialog()
 
-
-
-                    })
-                }
-                catch (error) {
-                    console.log(error)
-                }
                 console.log("Ai Analysis Ended")
-
 
             } catch (error) {
                 console.error('OCR Error:', error);
@@ -316,69 +391,67 @@ const Expense = () => {
 
     return (
         <>
+
+            <ToastContainer position="bottom-right" />
             <Sidebar display={sideBar} active='Expense' />
 
             <Layout layoutStyle={`relative ${sideBar ? 'left-[280px] w-[calc(100%-280px)] md:left-0 md:w-[100%] ]' : 'left-0 w-[100%] md:left-[220px] md:w-[calc(100%-220px)'} transition-all overflow-x-hidden `}>
                 <Topbar onClick={handleSideBar} />
 
-                <Flex flexStyle='flex-col p-5 sm:p-1 '>
+                <Flex flexStyle='flex-col gap-1 p-4 sm:p-1 sm:text-mobile'>
                     <Heading heading='Expense' />
-                    <Flex flexStyle='justify-between lg:flex-col lg:gap-2 sm:pt-3 sm:pb-3 pt-5 pb-7 overflow-x-hidden'>
-                        <Layout layoutStyle='flex gap-2'>
-                            <Input onChange={(e) => setSearchTerm(e.target.value)} placeholder='Search Expense' inputStyle='border-2 px-2 w-full rounded-sm  outline-none focus:border-blue-200' ></Input>
-                            <Button onClick={handleSearch} ButtonStyle="px-3 py-2 sm:px-2  sm:py-1 bg-regalBlue rounded" disabled={searchTerm === "" ? true : false}>Search</Button>
-                        </Layout>
-                        <Flex flexStyle='gap-10 flex-wrap'>
-                        <Button ButtonStyle="px-3 bg-teal-500 text-black text-[14px]  rounded" onClick={handlefileDialog} >ai analysis</Button>
+                    <SearchBar onChange={(e) => setSearchTerm(e.target.value)} placeholder='Search Expense' inputStyle='border-2 mt-0.5 p-2 w-full sm:py-1  outline-none focus:border-blue-200' />
+
+                    { /* <Button onClick={handleSearch} ButtonStyle="px-3 py-2 sm:px-2  sm:py-1 bg-regalBlue rounded" disabled={searchTerm === "" ? true : false}>Search</Button> */}
+                    <Flex flexStyle='gap-10 sm:justify-between text-mobile mt-1 '>
+                        <Button ButtonStyle="px-3  sm:px-2 sm:py-1 bg-teal-500 text-black  rounded" onClick={handlefileDialog} >ai analysis</Button>
 
                         <Button ButtonStyle="px-3 py-2 sm:px-2 sm:py-1 bg-regalBlue rounded" onClick={handleAddMode} ><i className="fa fa-plus pe-2"></i>add Expense</Button>
-</Flex>
                     </Flex>
 
-                    <Table data={memoizedExpenses || []} primaryKey="expenseId" columns={columns} isLoading={isLoading} handleSortUp={handleSortUp} handleSortDown={handleSortDown} onEdit={handleEditMode} onDelete={handleDelete} />
+                </Flex >
+                <Layout layoutStyle='h-full w-full px-4 sm:px-1'>
+                    <Table data={memoizedExpenses || []}
+                        primaryKey="expenseId" columns={columns} isLoading={isLoading} handleSortUp={handleSortUp} handleSortDown={handleSortDown} onEdit={handleEditMode} onDelete={deleteConfirmation} />
+
+                </Layout>
 
 
-                </Flex>
-            </Layout>
+            </Layout >
 
             {isOpen &&
                 <Modal heading={editMode ? "expense" : "add expense"} isOpen={isOpen} close={closeModal}>
 
                     <Flex flexStyle='flex-col px-3 sm:px-1 sm:text-sm'>
-                        {editMode ?
+
+                        {
+                        /**editMode ?
                             <>
                             </> : <>
                                 <Flex flexStyle='flex-col items-end pt-1'>
                                     <Button ButtonStyle="h-6 w-24 bg-teal-500 text-black text-[14px]  rounded" onClick={handlefileDialog} >ai analysis</Button>
                                 </Flex>
                             </>
-                        }
-                        <Form onSubmit={editMode ? handleUpdate : handleSave}>
-                            <Flex flexStyle='flex-col py-2 sm:py-1'>
-                                <Label labelText="Amount" />
-                                <Input type='number' value={Amount} onChange={(e) => setAmount(e.target.value)} inputStyle=' h-8  sm:px-1 w-full px-2 border-2 rounded-sm focus:border-regalBlue' />
-                            </Flex>
-                            <Flex flexStyle='flex-col py-2 sm:py-1 '>
-                                <Label labelText="Category" />
-                                <Input type='text' value={Category} onChange={(e) => setCategory(e.target.value)} inputStyle='h-8  sm:px-1 w-full px-2 border-2 rounded-sm focus:border-regalBlue' />
-                            </Flex>
-                            <Flex flexStyle='flex-col py-2 sm:py-1'>
-                                <Label labelText='Date' />
-                                <Input type='date' value={Date} onChange={(e) => setDate(e.target.value)} inputStyle='h-8 px-2 sm:px-1 focus:border-regalBlue border-2 w-full rounded-sm text-sm ' />
-                            </Flex>
-                            <Flex flexStyle='flex-col py-2 sm:py-1'>
-                                <Label labelText="Budget Type" />
-                                <Select value={BudgetType} data={memoizedBudgetData || []} onChange={(e) => setBudgetType(e.target.value)} Style='h-8  border-2 text-sm rounded-sm focus:border-regalBlue' />
-                            </Flex>
+            */}
+                        <Form onSubmit={confirmationDialog}>
+                            <Input type='number' labelText="Amount" value={Amount} onChange={(e) => setAmount(e.target.value)} inputStyle=' h-8  sm:px-1 w-full px-2 border-2  focus:border-regalBlue' />
+                            <Input type='text' labelText="Category" value={Category} onChange={(e) => setCategory(e.target.value)} inputStyle='h-8  sm:px-1 w-full px-2 border-2  focus:border-regalBlue' />
+                            <Input type='date' labelText='Date' value={Date} onChange={(e) => setDate(e.target.value)} inputStyle='h-8 px-2 sm:px-1 focus:border-regalBlue border-2 w-full  text-sm ' />
+                            <Label labelText="Budget Type" />
+                            <Select value={BudgetType} data={memoizedBudgetData} onChange={(e) => setBudgetType(e.target.value)} Style='h-8 border-2 text-sm ' />
                             <Button type='submit' ButtonStyle='px-3 py-2 bg-regalBlue  rounded sm:py-1 my-3 sm:text-sm'>{editMode ? "update" : "add"}</Button>
                         </Form>
                     </Flex>
                 </Modal>}
 
 
+            {openConfirm && <Confirmation handleFunction={editMode ? handleUpdate : handleSave} close={() => setConfirm(false)} message={editMode ? "Do you want to update the expense?" : "Do you want to save the expense?"} />}
+
+            {deleteConfirm && <Confirmation handleFunction={handleDelete} close={() => setDeleteConfirm(false)} message={"Do you want to delete the expense?"} />}
 
 
-            {fileDialogOpen &&
+            {
+                fileDialogOpen &&
                 <Dialog isOpen={fileDialogOpen} close={handlefileDialog} isLoading={analysisStarted} text={analysisStage}>
 
 
@@ -401,40 +474,32 @@ const Expense = () => {
                             </Layout>
 
                         )}
-
-
-
                     </Flex>
+                </Dialog>
+            }
+
+            {
+                dataDialog && <DataDialog isOpen={dataDialog} close={handleDataDialog}>
+                    {dataDialog && aiResult.map((item, index) => (
+                        <div className="flex gap-4">
+                            <input type="checkbox" defavalue={true} className="" />
+                            <input type="text" value={aiResult[Amount]} />
+                            <input type="text" value={aiResult[Category]} />
+                            <input type="text" value={aiResult[Date]} />
+                        </div>
+                    ))}
 
 
 
-
-                </Dialog>}
-
-
-
-                {dataDialog && <DataDialog isOpen={dataDialog}>
-                    {data.map((item,index)=>(
-                        <>
-                        <input type="checkbox" value={item.checkbox} />
-                        <input type="text" value={item.checkbox} />
-                        <input type="text" value={item.checkbox} />
-
-                        <input type="text" value={item.checkbox} />
-
-
-                        </>
-                    ))
-                    }
-                    
-                    </DataDialog>}
+                </DataDialog>
+            }
         </>
 
 
     )
 }
 
-export default Expense
+export default Expense;
 
 
 

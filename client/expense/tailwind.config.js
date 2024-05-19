@@ -27,7 +27,7 @@ export default {
         },
         fontSize:{
           'mobile':'15px',
-          'mobileTable':'13px'
+          'mobileTable':'14px'
         }
 
      

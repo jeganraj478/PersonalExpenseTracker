@@ -6,7 +6,7 @@ const FileUpload = ({ handleFileChange }) => {
             <label className='bg-regalBlue text-white px-2 py-1 rounded' htmlFor="fileInput" style={{ cursor: 'pointer' }}>
                 Upload
             </label>
-            <input
+            <input 
                 type="file"
                 id="fileInput"
                 style={{ display: 'none' }}

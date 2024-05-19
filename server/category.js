@@ -1,5 +1,5 @@
 const mongoose=require('mongoose')
-const sequence = require('mongoose-sequence')(mongoose)
+
 
 const categorySchema=new mongoose.Schema({
     categoryId:{
@@ -7,13 +7,16 @@ const categorySchema=new mongoose.Schema({
         required:true
     },
  categoryName:{
-        type:String
+        type:String,
+        required:true
     },
     categoryDescription:{
         type:String,
+        required:true
     },
     userId:{
-        type:Number
+        type:String,
+        required:true
     }
 },{
     timestamps:true

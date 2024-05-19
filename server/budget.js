@@ -7,13 +7,16 @@ const budgetSchema=new mongoose.Schema({
         requird:true
     },
     budgetName:{
-        type:String
+        type:String,
+        required:true
     },
     Amount:{
         type:Number,
+        required:true
     },
     userId:{
-        type:String
+        type:String,
+        required:true
     }
 },{
     timestamps:true

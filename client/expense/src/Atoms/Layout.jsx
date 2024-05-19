@@ -1,9 +1,9 @@
 import React from 'react';
 
-const Layout = ({ layoutStyle,children}) => {
+const Layout = ({ layoutStyle,children,onClick}) => {
 
     return (
-        <div
+        <div onClick={onClick}
         className={`${layoutStyle || ''} `}>
             {children}
         

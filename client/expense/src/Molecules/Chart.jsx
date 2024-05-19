@@ -35,11 +35,22 @@ const ChartComponent = ({ type, labels, data, chartLabel, backgroundColor, borde
                         bottom: 0
                     }
                 },
+                scales: {
+                    y: {
+                        beginAtZero: true
+                    },
+                    x:{
+                        beginAtZero: true
+                    }
+                }
 
             }
         });
 
     }, [type, labels, data, chartLabel, backgroundColor, hoverBackgroundColor, borderColor]);
+
+
+
 
     return (
 

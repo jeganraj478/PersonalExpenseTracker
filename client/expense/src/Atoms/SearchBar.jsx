@@ -1,9 +1,12 @@
 import React from 'react';
 
-const SearchBar = ({ onChange,placeholder}) => {
+const SearchBar = ({ type, onChange, placeholder, inputStyle }) => {
     return (
         <>
-        <input type='text' onChange={()=>onChange()} placeholder={placeholder} className='border-2 px-2 rounded-sm w-[40%] sm:w-56 outline-none focus:border-blue-200'/>
+            <input id='exp_seearch_bar'
+                type={type} onChange={onChange} placeholder={placeholder}
+                className={`${inputStyle} sm:text-mobile rounded outline-none focus:border-regalBlue`} required
+            />
         </>
     );
 }
