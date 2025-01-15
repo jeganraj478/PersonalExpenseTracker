@@ -1,4 +1,4 @@
-const express = require('express')
+itconst express = require('express')
 const mongoose = require('mongoose')
 const cors = require('cors')
 const bodyParser = require('body-parser')
@@ -22,8 +22,7 @@ const port = 3001;
 
 
 //DB
-const dbURI = 'mongodb+srv://jeganraj23092000:RdUlneqS1V3c5DsU@cluster0.kqsbpc2.mongodb.net/ExpenseTracker?retryWrites=true&w=majority'
-
+const dbURI = "URL"
 mongoose.connect(dbURI, {
   useNewUrlParser: true,
   useUnifiedTopology: true,
